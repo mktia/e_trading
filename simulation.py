@@ -56,13 +56,13 @@ middle_network = [
 
 blockchain = Coin()
 
-random_comsumption = []
-input_file = input('comsumption file: ')
-with open(f'./results/{input_file}.csv', newline='') as f:
+random_consumption = []
+input_file = input('consumption file: ')
+with open(f'./{input_file}', newline='') as f:
     reader = csv.reader(f)
     for row in reader:
         values = [float(i) for i in row]
-        random_comsumption.append(np.array(values))
+        random_consumption.append(np.array(values))
 
 
 def get_price(amount, trading_voltage, network_index):
@@ -76,6 +76,22 @@ def get_price(amount, trading_voltage, network_index):
         return 10 * np.exp(-1 * power_in_network / 1000)
     else:
         return 10 * np.exp(-1 * power_in_network / 1000) * (amount / 20)
+
+
+def get_price_linear(amount):
+    """
+    価格決定
+    余剰電力量に依存せず、パケットに含まれる電力量で線形に変動
+    """
+    return 10 * amount / 20
+
+
+def get_price_uniform():
+    """
+    価格決定
+    パケットに含まれる電力量に依存せず、定額
+    """
+    return 10
 
 
 def make_demand_packet_random(me, selected):
@@ -232,8 +248,11 @@ def send_to_node(packet):
     sender.discharge(packet)
     receiver.charge(packet)
 
+    # sender_network_index, sender_node_index = sender.get_location()
+    receiver_network_index, receiver_node_index = receiver.get_location()
+
     # 余剰電力の情報を更新
-    surplus_matrix[receiver.get_network()][receiver.get_location()[1] - 1] += packet.get_payload()
+    surplus_matrix[receiver_network_index][receiver_node_index - 1] += packet.get_payload()
 
     # 取引する電力のインデックス
     trading_voltage = np.argmax(packet.get_payload())
@@ -242,13 +261,15 @@ def send_to_node(packet):
 
     # 価格決定
     #price = get_price(trading_voltage, sender.get_network())
-    price = get_price(trading_amount, trading_voltage, sender.get_network())
+    # 余剰電力量情報＋周辺の電力から価格決定
+    # price = get_price(trading_amount, trading_voltage, sender.get_network())
+    # パケットで定額
+    price = get_price_linear(trading_amount)
 
-    network_index, node_index = sender.get_location()
     # キューから取得
     record = queue[network_index][trading_voltage].pop(0)
     # 電力分布記録の更新
-    el_queue[network_index][node_index - 1] -= packet.get_payload()[trading_voltage]
+    el_queue[receiver_network_index][receiver_node_index - 1] -= trading_amount
     
     # 需要家の支払い
     receiver.pay(price)
@@ -258,8 +279,17 @@ def send_to_node(packet):
     return price
 
 
-def save_packet_history(time, packet):
-    packets_history.append([[time], [f'{packet.get_from()[0]}/{packet.get_from()[1]}'], [f'{packet.get_to()[0]}/{packet.get_to()[1]}'], np.copy(packet.get_surplus()), np.copy(packet.get_payload())])
+def record_packet_history(time, inout, packet):
+    packets_history.append(
+        [
+            [time],
+            [inout],
+            [f'{packet.get_from()[0]}|{packet.get_from()[1]}'],
+            [f'{packet.get_to()[0]}|{packet.get_to()[1]}'],
+            np.copy(packet.get_surplus()),
+            np.copy(packet.get_payload())
+        ]
+    )
 
 
 if __name__ == '__main__':
@@ -274,7 +304,7 @@ if __name__ == '__main__':
 
         execute_time = datetime.now().strftime('%Y%m%d%H%M%S')
         # シミュレーション回数
-        simulation_length = 100
+        simulation_length = 10000
         # 電力使用の頻度
         use_span = 10
         # 電力使用量変動の間隔
@@ -291,15 +321,15 @@ if __name__ == '__main__':
         # ルータの初期化
         nodes = []
         nodes.append(Node((0, 0), '(0, 0)', buffer_middle, np.zeros(voltage_length), 0, 0, connected=middle_network[0], type='middle'))
-        nodes.append(Node((0, 1), '(0, 1)', buffer_edge, np.array(random_comsumption.pop(0)), initial_coin, 0))
-        nodes.append(Node((0, 2), '(0, 2)', buffer_edge, np.array(random_comsumption.pop(0)), initial_coin, 0))
-        nodes.append(Node((0, 3), '(0, 3)', buffer_edge, np.array(random_comsumption.pop(0)), initial_coin, 0))
-        nodes.append(Node((0, 4), '(0, 4)', buffer_edge, np.array(random_comsumption.pop(0)), initial_coin, 0))
+        nodes.append(Node((0, 1), '(0, 1)', buffer_edge, np.array(random_consumption.pop(0)), initial_coin, 0))
+        nodes.append(Node((0, 2), '(0, 2)', buffer_edge, np.array(random_consumption.pop(0)), initial_coin, 0))
+        nodes.append(Node((0, 3), '(0, 3)', buffer_edge, np.array(random_consumption.pop(0)), initial_coin, 0))
+        nodes.append(Node((0, 4), '(0, 4)', buffer_edge, np.array(random_consumption.pop(0)), initial_coin, 0))
         nodes.append(Node((1, 0), '(1, 0)', buffer_middle, np.zeros(voltage_length), 0, 0, connected=middle_network[1], type='middle'))
-        nodes.append(Node((1, 1), '(1, 1)', buffer_edge, np.array(random_comsumption.pop(0)), initial_coin, 0))
-        nodes.append(Node((1, 2), '(1, 2)', buffer_edge, np.array(random_comsumption.pop(0)), initial_coin, 0))
-        nodes.append(Node((1, 3), '(1, 3)', buffer_edge, np.array(random_comsumption.pop(0)), initial_coin, 0))
-        nodes.append(Node((1, 4), '(1, 4)', buffer_edge, np.array(random_comsumption.pop(0)), initial_coin, 0))
+        nodes.append(Node((1, 1), '(1, 1)', buffer_edge, np.array(random_consumption.pop(0)), initial_coin, 0))
+        nodes.append(Node((1, 2), '(1, 2)', buffer_edge, np.array(random_consumption.pop(0)), initial_coin, 0))
+        nodes.append(Node((1, 3), '(1, 3)', buffer_edge, np.array(random_consumption.pop(0)), initial_coin, 0))
+        nodes.append(Node((1, 4), '(1, 4)', buffer_edge, np.array(random_consumption.pop(0)), initial_coin, 0))
 
         # ノード対応辞書
         nodes_dict = {node.get_name():node for node in nodes}
@@ -312,9 +342,9 @@ if __name__ == '__main__':
         tmp = [[0]]
         for node in nodes:
             # ノードラベル
-            tmp.append(['node' + str(node.get_name()).replace(', ', '/').replace('(', '').replace(')', '') for i in range(nodes[0].get_voltage_length())])
+            tmp.append(['nd' + str(node.get_name()).replace(', ', '/').replace('(', '').replace(')', '') for i in range(nodes[0].get_voltage_length())])
         # コインラベル
-        tmp.append(['coin' + str(node.get_name()).replace(', ', '/').replace('(', '').replace(')', '') for node in nodes])
+        tmp.append(['c' + str(node.get_name()).replace(', ', '/').replace('(', '').replace(')', '') for node in nodes])
         # generated
         tmp.append(['gen' + str(node.get_name()).replace(', ', '/').replace('(', '').replace(')', '') for node in nodes])
         # price (each NW)
@@ -361,7 +391,7 @@ if __name__ == '__main__':
                     # 自然放電
                     node.leak(efficiency)
                     if not node.is_middle():
-                        node.consumption(random_comsumption.pop(0))
+                        node.consumption(random_consumption.pop(0))
                 # 自然放電を電力分布の記録に反映
                 for network in el_queue:
                     network *= efficiency
@@ -372,25 +402,28 @@ if __name__ == '__main__':
                             record['amount'] *= efficiency
 
             for network_index in range(world_size):
-                # 末端ルータの送信
+                # 末端ルータのランダムな選択
                 sender = nodes_dict[str((network_index, np.random.randint(1, network_list[network_index])))]
+                # パケットの生成
                 packet = make_packet_to_middle(sender)
                 # パケットを記録
-                save_packet_history(time, packet)
+                record_packet_history(time, 'IN', packet)
                 # デジタルコインの発行
                 #generated_coin = blockchain.f(packet)
-                generated_coin = blockchain.c(packet)
-                # 中間ルータへの送電
+                generated_coin = blockchain.c_linear(packet)
+                # 末端ルータから中間ルータへの送電
                 send_to_middle(packet, generated_coin)
 
-                # 中間ルータの送信
+                # 中間ルータの選択
                 sender = nodes_dict[str((network_index, 0))]
+                # パケットの生成
                 packet = make_packet_to_prior_node(sender)
                 #packet = make_packet_to_the_rich(sender)
+                # 中間ルータから末端ルータへの送電
                 if packet != None:
                     payment = send_to_node(packet)
-                    payment_history.append([time] + payment)
-                    save_packet_history(time, packet)
+                    # payment_history.append([time] + payment)
+                    record_packet_history(time, 'OUT', packet)
 
             if time % middle_span == 0:
                 for node in nodes:
@@ -399,7 +432,7 @@ if __name__ == '__main__':
                         packet = make_demand_packet_random(node.get_location(), node.select_middle())
                         packet = make_supply_packet(packet)
                         if packet != None:
-                            save_packet_history(time, packet)
+                            record_packet_history(time, 'MID', packet)
                             send_among_middle(packet)
 
             tmp = [[time]]
@@ -411,7 +444,8 @@ if __name__ == '__main__':
             # price
             for network_index in range(world_size):
                 middle = nodes_dict[str((network_index, 0))]
-                tmp.append([get_price(None, v, network_index) for v in range(middle.get_voltage_length())])
+                # tmp.append([get_price(None, v, network_index) for v in range(middle.get_voltage_length())])
+                tmp.append([get_price_uniform() for v in range(middle.get_voltage_length())])
             history.append(tmp)
 
             # 電力分布
@@ -431,20 +465,20 @@ if __name__ == '__main__':
                 f.write('\n')
         output_files.append(f'{execute_time}_nodes.csv')
 
-        # print('packets history')
-        # with open(f'{HERE}/{execute_time}_packets.csv', 'w') as f:
-        #     f.write('time, from, to, surplus_v1, surplus_v2, surplus_v3, surplus_v4, surplus_v5, payload_v1, payload_v2, payload_v3, payload_v4, payload_v5\n')
-        #     for h in tqdm(packets_history):
-        #         for vector in h:
-        #             for item in vector:
-        #                 f.write(f'{item}, ')
-        #         f.write('\n')
+        print('packets history')
+        with open(f'{RESULT_DIR}/{execute_time}_packets.csv', 'w') as f:
+            f.write('time,inout,from,to,s_v1,s_v2,s_v3,s_v4,s_v5,p_v1,p_v2,p_v3,p_v4,p_v5\n')
+            for h in packets_history:
+                for vector in h:
+                    for item in vector:
+                        f.write(f'{item},')
+                f.write('\n')
 
         # print('payments history')
         # with open(f'{HERE}/{execute_time}_payments.csv', 'w') as f:
         #     for h in tqdm(payment_history):
         #         for item in h:
-        #             f.write(f'{item}, ')
+        #             f.write(f'{item},')
         #         f.write('\n')
 
         # with open(f'{HERE}/{execute_time}_nodeappend.txt', 'w') as f:
