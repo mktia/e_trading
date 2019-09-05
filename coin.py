@@ -38,6 +38,7 @@ class Coin():
         return generated_coin
 
 
+    # 中間ルータの余剰電力量情報を参照しているため不使用
     def g(self, middle_node, nodes, voltage_index, lamb=10):
         """
         電力価格の決定
@@ -61,7 +62,15 @@ class Coin():
         # return lamb * np.exp(-1 * middle_node.get_current_buffer(voltage_index) / 100)
 
 
-    def c_(self):
+    # 中間ルータの余剰電力量情報を参照しているため不使用
+    def g_uniform(self):
+        """
+        電力パケットを定額で売買
+        """
+        return 10
+
+
+    def c_uniform(self):
         """
         for simulation5a.py
         電力パケットの到着ごとに定量を発行
@@ -69,7 +78,7 @@ class Coin():
         return 10
 
 
-    def c(self, packet):
+    def c_linear(self, packet):
         """
         電力パケットに含まれる電力量に応じて線形に発行
         """
