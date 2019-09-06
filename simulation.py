@@ -339,35 +339,68 @@ if __name__ == '__main__':
         #     print(f'{node.get_name()} {node.get_surplus()}')
 
         # インデックス行
-        tmp = [[0]]
+        tmp = ['time']
         for node in nodes:
             # ノードラベル
-            tmp.append(['nd' + str(node.get_name()).replace(', ', '/').replace('(', '').replace(')', '') for i in range(nodes[0].get_voltage_length())])
+            tmp += [f"nd{str(node.get_name()).replace(', ', '/').replace('(', '').replace(')', '')}_v{i + 1}" for i in range(
+                nodes[0].get_voltage_length())]
         # コインラベル
-        tmp.append(['c' + str(node.get_name()).replace(', ', '/').replace('(', '').replace(')', '') for node in nodes])
+        tmp += ['c' + str(node.get_name()).replace(', ',
+                                                   '/').replace('(', '').replace(')', '') for node in nodes]
         # generated
-        tmp.append(['gen' + str(node.get_name()).replace(', ', '/').replace('(', '').replace(')', '') for node in nodes])
+        tmp += ['gen' + str(node.get_name()).replace(', ',
+                                                     '/').replace('(', '').replace(')', '') for node in nodes]
         # price (each NW)
-        tmp.append(np.arange(nodes[0].get_voltage_length()))
-        tmp.append(np.arange(nodes[0].get_voltage_length()))
+        tmp += [f'pr_nw{nw}_v{v + 1}' for nw in range(world_size)
+                for v in range(voltage_length)]
         # 電力分布のラベル
         for network in range(world_size):
-            tmp.append([f'el{network}/{node_id + 1}' for node_id in range(network_edge)])
+            tmp += [
+                f'el{network}/{node_id + 1}' for node_id in range(network_edge)]
+        # 取引によるコインの変動のラベル
+        for network in range(world_size):
+            tmp += [
+                f'tr{network}/{node_id + 1}' for node_id in range(network_edge)]
+        # 取引・発行によるコインの変動のラベル
+        for network in range(world_size):
+            tmp += [
+                f't&g{network}/{node_id + 1}' for node_id in range(network_edge)]
+        # 瞬間的な電力損失量のラベル
+        for network in range(world_size):
+            tmp += [
+                f'ls{network}/{node_id}' for node_id in range(network_size)]
+        # 累積の電力損失量のラベル
+        for network in range(world_size):
+            tmp += [
+                f'ls_cml{network}/{node_id}' for node_id in range(network_size)]
+        # ネットワーク別の累積電力損失量
+        tmp += [f'ls_cml_nw{nw}' for nw in range(world_size)]
+
         history.append(tmp)
 
-
         # 初期値の記録
-        tmp = [[0]]
-        tmp += [deepcopy(node.get_surplus()) for node in nodes]
+        tmp = ['0']
+        tmp += [item for node in nodes for item in np.copy(node.get_surplus())]
         # コインの初期値
-        tmp.append([node.get_coin() for node in nodes])
+        tmp += [node.get_coin() for node in nodes]
         # generated
-        tmp.append([node.get_generated_coin() for node in nodes])
+        tmp += [node.get_generated_coin() for node in nodes]
         # price
-        tmp += [np.zeros(nodes[0].get_voltage_length()) for i in range(world_size)]
+        tmp += [j for i in range(world_size) for j in np.zeros(voltage_length)]
         # 電力分布の初期値
         for network_el_queue in el_queue:
-            tmp.append(np.copy(network_el_queue))
+            tmp += np.copy(network_el_queue).tolist()
+        # 電力分布の初期値
+        tmp += np.zeros(world_size * network_edge).tolist()
+        # 電力分布の初期値
+        tmp += np.zeros(world_size * network_edge).tolist()
+        # 瞬間的電力損失の初期値
+        tmp += np.zeros(world_size * network_size).tolist()
+        # 累積した電力損失の初期値
+        tmp += np.zeros(world_size * network_size).tolist()
+        # ネットワーク別累積電力損失量
+        tmp += np.zeros(world_size).tolist()
+
         history.append(tmp)
 
         # 各ネットワークのルータ数
@@ -435,23 +468,36 @@ if __name__ == '__main__':
                             record_packet_history(time, 'MID', packet)
                             send_among_middle(packet)
 
-            tmp = [[time]]
-            tmp += [deepcopy(node.get_surplus()).tolist() for node in nodes]
+            tmp = [time]
+            # surplus
+            tmp += [item for node in nodes for item in np.copy(
+                node.get_surplus())]
             # coin
-            tmp.append([node.get_coin() for node in nodes])
+            tmp += [node.get_coin() for node in nodes]
             # generated
-            tmp.append([node.get_generated_coin() for node in nodes])
+            tmp += [node.get_generated_coin() for node in nodes]
             # price
             for network_index in range(world_size):
                 middle = nodes_dict[str((network_index, 0))]
-                # tmp.append([get_price(None, v, network_index) for v in range(middle.get_voltage_length())])
-                tmp.append([get_price_uniform() for v in range(middle.get_voltage_length())])
-            history.append(tmp)
-
+                # tmp+=[get_price(None, v, network_index) for v in range(middle.get_voltage_length())])
+                tmp += [get_price_uniform()
+                        for v in range(middle.get_voltage_length())]
             # 電力分布
             for network_el_queue in el_queue:
-                tmp.append(np.copy(network_el_queue))
+                tmp += np.copy(network_el_queue).tolist()
+            # 取引によるコインの変動
+            tmp += [node.get_coin() - 100 for node in nodes if not node.is_middle()]
+            # 発行・取引によるコインの変動
+            tmp += [np.copy(node.get_coin()) + np.copy(node.get_generated_coin()
+                                                       ) - 100 for node in nodes if not node.is_middle()]
+            # 瞬間的な電力損失の記録
+            tmp += [nd for nw in ls_amount.tolist() for nd in nw]
+            # 累積の電力損失の記録
+            tmp += [nd for nw in ls_cumul_amount.tolist() for nd in nw]
+            # ネットワーク別累積電力損失量の記録
+            tmp += [np.sum(nw) for nw in ls_cumul_amount]
 
+            history.append(tmp)
 
         end_time = tm.perf_counter_ns()
 
