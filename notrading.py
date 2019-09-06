@@ -45,18 +45,28 @@ def pickup_surplus(electricity):
     return loss
 
 
-# 変数名の省略
-nws = world_size
-nds = network_edge
-label = ['time'] + [f'nd{nw}/{nd + 1}' for nw in range(nws) for nd in range(nds) for i in range(5)] + [f'ls{nw}/{nd + 1}' for nw in range(
-    nws) for nd in range(nds)] + [f'ls_cml{nw}/{nd + 1}' for nw in range(nws) for nd in range(nds)]
-
 el_amount = [[np.array(random_consumption.pop(0))
               for i in range(network_edge)] for j in range(world_size)]
 ls_amount = [[0 for nd in range(network_edge)] for nw in range(world_size)]
 ls_cumul_amount = [[0 for nd in range(network_edge)]
                    for nw in range(world_size)]
 
+# 変数名の省略
+nws = world_size
+nds = network_edge
+# time
+label = ['time']
+# surplus
+label += [f'nd{nw}/{nd + 1}' for nw in range(nws)
+          for nd in range(nds) for i in range(5)]
+# loss
+label += [f'ls{nw}/{nd + 1}' for nw in range(nws) for nd in range(nds)]
+# cumulative loss
+label += [f'ls_cml{nw}/{nd + 1}' for nw in range(nws) for nd in range(nds)]
+# cumulative loss in each network
+label += [f'ls_cml_nw{nw}' for nw in range(nws)]
+
+# ラベル
 output = [label]
 output.append(['0'] + [el_item for el_network in el_amount for el_node in el_network for el_item in el_node] +
               [item for nw in ls_amount for item in nw] + [item for nw in ls_cumul_amount for item in nw])
