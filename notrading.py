@@ -101,8 +101,17 @@ for i in range(simulation_length):
                 # 電力の消費生産
                 el_node += random_consumption.pop(0)
 
-    output.append([time] + deepcopy([item for el_network in el_amount for el_node in el_network for item in el_node]) +
-                  deepcopy([item for nw in ls_amount for item in nw])+deepcopy([item for nw in ls_cumul_amount for item in nw]))
+    res = [time]
+    # 取引なしの余剰電力量
+    res += [amount for el_nw in el_amount for el_nd in el_nw for amount in el_nd]
+    # 瞬間的電力損失量
+    res += [amount for nw in ls_amount for amount in nw]
+    # 累積電力損失量
+    res += [amount for nw in ls_cumul_amount for amount in nw]
+    # ネットワーク別累積電力損失量
+    res += [np.sum(nw) for nw in ls_cumul_amount]
+
+    output.append(res)
 
 
 print('Saving...')
