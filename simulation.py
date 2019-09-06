@@ -413,14 +413,30 @@ if __name__ == '__main__':
                     break
 
         start_time = tm.perf_counter_ns()
-        # 実行時間測定
+
+        # 累積した電力損失量を保存
+        ls_cumul_amount = np.zeros((world_size, network_size))
+
         # for i in tqdm(range(simulation_length)):
         for i in range(simulation_length):
             time = i + 1
             efficiency = 0.95
 
+            # 瞬間的な電力損失量を保存
+            ls_amount = np.zeros((world_size, network_size))
+
             if time % use_span == 0:
                 for node in nodes:
+                    # 電力損失量
+                    tmp = np.copy(node.get_surplus()) * (1 - efficiency)
+                    for i, amount in enumerate(tmp):
+                        if amount < 0:
+                            tmp[i] = 0
+                    leak = np.sum(tmp)
+                    # 電力損失の記録
+                    nw, nd = node.get_location()
+                    ls_amount[nw, nd] = leak
+                    ls_cumul_amount[nw, nd] += leak
                     # 自然放電
                     node.leak(efficiency)
                     if not node.is_middle():
@@ -505,18 +521,17 @@ if __name__ == '__main__':
         end_time = tm.perf_counter_ns()
 
         # print(f'nodes history: {execute_time}_nodes')
-        with open(f'{RESULT_DIR}/{execute_time}_nodes.csv', 'w') as f:
-            # for h in tqdm(history):
+        with open(f'{RESULT_DIR}/{execute_time}_nodes.csv', 'w', newline='') as f:
+            writer = csv.writer(f)
             for h in history:
-                for vector in h:
-                    for v in vector:
-                        f.write(f'{str(v)},')
-                f.write('\n')
+                writer.writerow(h)
+
         output_files.append(f'{execute_time}_nodes.csv')
 
-        print('packets history')
+        print('packets history saving...')
         with open(f'{RESULT_DIR}/{execute_time}_packets.csv', 'w') as f:
-            f.write('time,inout,from,to,s_v1,s_v2,s_v3,s_v4,s_v5,p_v1,p_v2,p_v3,p_v4,p_v5\n')
+            f.write(
+                'time,inout,from,to,s_v1,s_v2,s_v3,s_v4,s_v5,p_v1,p_v2,p_v3,p_v4,p_v5\n')
             for h in packets_history:
                 for vector in h:
                     for item in vector:
