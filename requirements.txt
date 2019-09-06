@@ -1,4 +1,6 @@
+autopep8
 matplotlib
 numpy
 pandas
+pylint
 tqdm
