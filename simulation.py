@@ -426,9 +426,12 @@ if __name__ == '__main__':
                     if not node.is_middle():
                         node.consumption(random_consumption.pop(0))
                 # 自然放電を電力分布の記録に反映
-                for network in el_queue:
-                    network *= efficiency
+                for nw, el_nw in enumerate(el_queue):
+                    for nd, el_nd in enumerate(el_nw):
+                        if el_nd > 0:
+                            el_queue[nw][nd] *= efficiency
                 # ロスを queue に反映
+                # 電力量は常に正なので問題ない
                 for network in queue:
                     for voltage in network:
                         for record in voltage:
