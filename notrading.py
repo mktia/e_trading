@@ -68,8 +68,20 @@ label += [f'ls_cml_nw{nw}' for nw in range(nws)]
 
 # ラベル
 output = [label]
-output.append(['0'] + [el_item for el_network in el_amount for el_node in el_network for el_item in el_node] +
-              [item for nw in ls_amount for item in nw] + [item for nw in ls_cumul_amount for item in nw])
+
+# 初期値
+# time
+res = [0]
+# surplus
+res += [amount for el_nw in el_amount for el_nd in el_nw for amount in el_nd]
+# loss
+res += [amount for nw in ls_amount for amount in nw]
+# cumulative loss
+res += [amount for nw in ls_cumul_amount for amount in nw]
+# cumulative loss in each network
+res += [np.sum(nw) for nw in ls_cumul_amount]
+
+output.append(res)
 
 
 for i in range(simulation_length):
